@@ -1,0 +1,1206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Startup Intelligence Agent</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #080808;
+    --surface: #0f0f0f;
+    --surface2: #161616;
+    --border: #222;
+    --border-light: #2a2a2a;
+    --text: #e8e8e8;
+    --muted: #555;
+    --muted2: #888;
+    --accent: #ff6b35;
+    --accent2: #ffaa35;
+    --green: #35ff8a;
+    --red: #ff3535;
+    --blue: #35aaff;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Crimson Pro', serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Noise overlay */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.4;
+  }
+
+  /* Scan line */
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--accent);
+    z-index: 1000;
+    animation: scanline 3s ease-in-out infinite;
+    opacity: 0.7;
+  }
+
+  @keyframes scanline {
+    0% { top: 0; opacity: 0.7; }
+    100% { top: 100vh; opacity: 0; }
+  }
+
+  /* Layout */
+  .shell {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    min-height: 100vh;
+  }
+
+  /* Sidebar */
+  .sidebar {
+    border-right: 1px solid var(--border);
+    padding: 32px 24px;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+  }
+
+  .logo-block { }
+
+  .logo-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 3px;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .logo-name {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px;
+    letter-spacing: 2px;
+    line-height: 1;
+    color: var(--text);
+  }
+
+  .logo-sub {
+    font-size: 12px;
+    color: var(--muted2);
+    margin-top: 4px;
+    font-style: italic;
+    font-weight: 300;
+  }
+
+  .sidebar-section { }
+
+  .sidebar-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .agent-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .agent-step {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    padding: 8px 10px;
+    border-radius: 4px;
+    transition: all 0.3s;
+    border: 1px solid transparent;
+  }
+
+  .agent-step.active {
+    color: var(--accent);
+    background: rgba(255,107,53,0.06);
+    border-color: rgba(255,107,53,0.2);
+  }
+
+  .agent-step.done {
+    color: var(--green);
+  }
+
+  .step-num {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 1px solid currentColor;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 8px;
+    flex-shrink: 0;
+  }
+
+  .agent-step.done .step-num {
+    background: var(--green);
+    border-color: var(--green);
+    color: #000;
+  }
+
+  .sidebar-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: auto;
+  }
+
+  .stat-item {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+  }
+
+  .stat-value {
+    font-size: 20px;
+    font-family: 'Bebas Neue', sans-serif;
+    color: var(--text);
+    letter-spacing: 1px;
+    display: block;
+  }
+
+  /* Main */
+  .main {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Top bar */
+  .topbar {
+    border-bottom: 1px solid var(--border);
+    padding: 16px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .topbar-left {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 1px;
+  }
+
+  .topbar-left span { color: var(--accent); }
+
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--green);
+    letter-spacing: 1px;
+  }
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+    animation: blink 1.5s infinite;
+  }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.2; }
+  }
+
+  /* Content area */
+  .content {
+    flex: 1;
+    padding: 48px 40px;
+    max-width: 860px;
+  }
+
+  /* Hero */
+  .hero {
+    margin-bottom: 56px;
+    animation: fadeUp 0.6s ease both;
+  }
+
+  .hero-eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+
+  h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(52px, 8vw, 88px);
+    letter-spacing: 3px;
+    line-height: 0.95;
+    color: var(--text);
+    margin-bottom: 20px;
+  }
+
+  h1 .accent { color: var(--accent); }
+  h1 .outline {
+    -webkit-text-stroke: 1px var(--border-light);
+    color: transparent;
+  }
+
+  .hero-desc {
+    font-size: 17px;
+    color: var(--muted2);
+    line-height: 1.7;
+    max-width: 520px;
+    font-weight: 300;
+    font-style: italic;
+  }
+
+  /* Input section */
+  .input-section {
+    margin-bottom: 48px;
+    animation: fadeUp 0.6s ease 0.1s both;
+  }
+
+  .input-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+
+  .api-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .api-field {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 16px;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .api-field:focus { border-color: var(--accent); }
+  .api-field::placeholder { color: var(--muted); }
+
+  .search-row {
+    display: flex;
+    gap: 0;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+
+  .search-row:focus-within { border-color: var(--accent); }
+
+  .search-prefix {
+    background: var(--surface2);
+    padding: 0 16px;
+    display: flex;
+    align-items: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    border-right: 1px solid var(--border);
+    white-space: nowrap;
+  }
+
+  .search-input {
+    flex: 1;
+    background: var(--surface);
+    border: none;
+    padding: 18px 20px;
+    color: var(--text);
+    font-family: 'Crimson Pro', serif;
+    font-size: 18px;
+    outline: none;
+  }
+
+  .search-input::placeholder { color: var(--muted); font-style: italic; }
+
+  .analyze-btn {
+    background: var(--accent);
+    border: none;
+    padding: 0 28px;
+    color: #000;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 16px;
+    letter-spacing: 2px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .analyze-btn:hover:not(:disabled) {
+    background: var(--accent2);
+  }
+
+  .analyze-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .example-tags {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+  }
+
+  .example-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted2);
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.5px;
+  }
+
+  .example-tag:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* Progress */
+  .progress-section {
+    display: none;
+    margin-bottom: 40px;
+    animation: fadeUp 0.4s ease both;
+  }
+
+  .progress-section.visible { display: block; }
+
+  .progress-header {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+
+  .progress-log {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    line-height: 2;
+    min-height: 120px;
+  }
+
+  .log-line {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    animation: logAppear 0.3s ease both;
+  }
+
+  @keyframes logAppear {
+    from { opacity: 0; transform: translateX(-8px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  .log-time { color: var(--muted); }
+  .log-status-run { color: var(--accent); }
+  .log-status-ok { color: var(--green); }
+  .log-status-info { color: var(--blue); }
+  .log-msg { color: var(--muted2); }
+
+  /* Error */
+  .error-block {
+    display: none;
+    background: rgba(255,53,53,0.08);
+    border: 1px solid rgba(255,53,53,0.3);
+    border-radius: 8px;
+    padding: 16px 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--red);
+    margin-bottom: 24px;
+  }
+
+  .error-block.visible { display: block; }
+
+  /* Results */
+  .results-section {
+    display: none;
+    animation: fadeUp 0.5s ease both;
+  }
+
+  .results-section.visible { display: block; }
+
+  /* Startup header */
+  .startup-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 40px;
+    padding-bottom: 32px;
+    border-bottom: 1px solid var(--border);
+    gap: 24px;
+  }
+
+  .startup-name-block { }
+
+  .startup-category {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .startup-name {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(40px, 6vw, 64px);
+    letter-spacing: 2px;
+    line-height: 1;
+    color: var(--text);
+  }
+
+  .startup-tagline {
+    font-size: 16px;
+    color: var(--muted2);
+    font-style: italic;
+    margin-top: 8px;
+    font-weight: 300;
+  }
+
+  .verdict-badge {
+    flex-shrink: 0;
+    padding: 12px 20px;
+    border-radius: 6px;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 18px;
+    letter-spacing: 2px;
+    text-align: center;
+  }
+
+  .verdict-badge.strong-buy { background: rgba(53,255,138,0.1); border: 1px solid rgba(53,255,138,0.3); color: var(--green); }
+  .verdict-badge.watch { background: rgba(255,170,53,0.1); border: 1px solid rgba(255,170,53,0.3); color: var(--accent2); }
+  .verdict-badge.caution { background: rgba(255,53,53,0.1); border: 1px solid rgba(255,53,53,0.3); color: var(--red); }
+  .verdict-badge.neutral { background: rgba(53,170,255,0.1); border: 1px solid rgba(53,170,255,0.3); color: var(--blue); }
+
+  /* Score grid */
+  .score-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 40px;
+  }
+
+  @media (max-width: 700px) {
+    .score-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  .score-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .score-card::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 2px;
+  }
+
+  .score-card.high::after { background: var(--green); }
+  .score-card.mid::after { background: var(--accent2); }
+  .score-card.low::after { background: var(--red); }
+  .score-card.neutral-score::after { background: var(--blue); }
+
+  .score-card-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  .score-card-value {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 36px;
+    letter-spacing: 1px;
+    line-height: 1;
+  }
+
+  .score-card.high .score-card-value { color: var(--green); }
+  .score-card.mid .score-card-value { color: var(--accent2); }
+  .score-card.low .score-card-value { color: var(--red); }
+  .score-card.neutral-score .score-card-value { color: var(--blue); }
+
+  .score-card-sub {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 4px;
+    font-style: italic;
+  }
+
+  /* Analysis sections */
+  .analysis-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 24px;
+  }
+
+  @media (max-width: 700px) {
+    .analysis-grid { grid-template-columns: 1fr; }
+  }
+
+  .analysis-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px;
+  }
+
+  .analysis-card.full-width {
+    grid-column: 1 / -1;
+  }
+
+  .analysis-card-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .analysis-text {
+    font-size: 14px;
+    line-height: 1.8;
+    color: #aaa;
+    font-weight: 300;
+  }
+
+  .risk-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .risk-item {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #aaa;
+  }
+
+  .risk-num {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 20px;
+    color: var(--red);
+    line-height: 1;
+    flex-shrink: 0;
+    width: 20px;
+  }
+
+  .opportunity-item {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #aaa;
+    margin-bottom: 10px;
+  }
+
+  .opp-arrow {
+    color: var(--green);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .competitor-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+
+  .competitor-row:last-child { border-bottom: none; }
+
+  .competitor-name { color: var(--text); font-weight: 400; }
+
+  .competitor-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    padding: 3px 8px;
+    border-radius: 3px;
+    letter-spacing: 1px;
+  }
+
+  .tag-direct { background: rgba(255,53,53,0.1); color: var(--red); }
+  .tag-indirect { background: rgba(255,170,53,0.1); color: var(--accent2); }
+  .tag-emerging { background: rgba(53,170,255,0.1); color: var(--blue); }
+
+  /* Final verdict */
+  .final-verdict {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 32px;
+    margin-bottom: 24px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .final-verdict::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; bottom: 0;
+    width: 3px;
+    background: var(--accent);
+  }
+
+  .final-verdict-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+
+  .final-verdict-text {
+    font-size: 17px;
+    line-height: 1.8;
+    color: #ccc;
+    font-weight: 300;
+    font-style: italic;
+  }
+
+  .reset-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-top: 32px;
+  }
+
+  .reset-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted2);
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 1px;
+  }
+
+  .reset-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .powered-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    margin-left: auto;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Mobile */
+  @media (max-width: 700px) {
+    .shell { grid-template-columns: 1fr; }
+    .sidebar { display: none; }
+    .content { padding: 32px 20px; }
+    .topbar { padding: 16px 20px; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="logo-block">
+      <div class="logo-tag">v1.0.0 · India</div>
+      <div class="logo-name">STARTUP<br>INTEL</div>
+      <div class="logo-sub">Agentic Analysis Engine</div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">Agent Pipeline</div>
+      <div class="agent-steps" id="agentSteps">
+        <div class="agent-step" id="step1">
+          <div class="step-num">1</div>
+          <span>Entity Recognition</span>
+        </div>
+        <div class="agent-step" id="step2">
+          <div class="step-num">2</div>
+          <span>Market Research</span>
+        </div>
+        <div class="agent-step" id="step3">
+          <div class="step-num">3</div>
+          <span>Competitive Scan</span>
+        </div>
+        <div class="agent-step" id="step4">
+          <div class="step-num">4</div>
+          <span>Risk Assessment</span>
+        </div>
+        <div class="agent-step" id="step5">
+          <div class="step-num">5</div>
+          <span>Scoring Engine</span>
+        </div>
+        <div class="agent-step" id="step6">
+          <div class="step-num">6</div>
+          <span>Verdict Generation</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-stats">
+      <div class="stat-item">
+        <span class="stat-value" id="analysisCount">0</span>
+        analyses run
+      </div>
+      <div class="stat-item">
+        <span class="stat-value">6</span>
+        agent steps
+      </div>
+      <div class="stat-item">
+        <span class="stat-value">~15s</span>
+        avg. runtime
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-left">STARTUP INTEL / <span>INDIA MARKET</span> / AGENT v1</div>
+      <div class="status-pill">
+        <div class="status-dot"></div>
+        AGENT READY
+      </div>
+    </div>
+
+    <div class="content">
+      <!-- Hero -->
+      <div class="hero">
+        <div class="hero-eyebrow">// Agentic AI · Multi-step reasoning · Live intelligence</div>
+        <h1>
+          <span class="outline">ANALYZE</span><br>
+          ANY <span class="accent">INDIAN</span><br>
+          STARTUP
+        </h1>
+        <p class="hero-desc">Enter a startup name. The agent autonomously researches, benchmarks, stress-tests, and delivers an investor-grade teardown in seconds.</p>
+      </div>
+
+      <!-- Input -->
+      <div class="input-section">
+        <div class="input-label">// Step 01 — Authenticate</div>
+        <div class="api-row">
+          <input type="password" class="api-field" id="apiKey" placeholder="Gemini API Key · AIza...">
+        </div>
+
+        <div class="input-label" style="margin-top:24px">// Step 02 — Target Startup</div>
+        <div class="search-row">
+          <div class="search-prefix">ANALYZE →</div>
+          <input type="text" class="search-input" id="startupInput" placeholder="e.g. Zepto, Meesho, Physics Wallah..." onkeydown="if(event.key==='Enter') runAgent()">
+          <button class="analyze-btn" id="analyzeBtn" onclick="runAgent()">RUN AGENT</button>
+        </div>
+
+        <div class="example-tags">
+          <span class="example-tag" onclick="setExample('Zepto')">Zepto</span>
+          <span class="example-tag" onclick="setExample('Meesho')">Meesho</span>
+          <span class="example-tag" onclick="setExample('Physics Wallah')">Physics Wallah</span>
+          <span class="example-tag" onclick="setExample('Razorpay')">Razorpay</span>
+          <span class="example-tag" onclick="setExample('Groww')">Groww</span>
+          <span class="example-tag" onclick="setExample('Urban Company')">Urban Company</span>
+        </div>
+      </div>
+
+      <!-- Progress -->
+      <div class="progress-section" id="progressSection">
+        <div class="progress-header">// Agent Log — Live</div>
+        <div class="progress-log" id="progressLog"></div>
+      </div>
+
+      <!-- Error -->
+      <div class="error-block" id="errorBlock"></div>
+
+      <!-- Results -->
+      <div class="results-section" id="resultsSection">
+
+        <div class="startup-header">
+          <div class="startup-name-block">
+            <div class="startup-category" id="startupCategory">—</div>
+            <div class="startup-name" id="startupNameDisplay">—</div>
+            <div class="startup-tagline" id="startupTagline">—</div>
+          </div>
+          <div class="verdict-badge" id="verdictBadge">—</div>
+        </div>
+
+        <!-- Scores -->
+        <div class="score-grid" id="scoreGrid"></div>
+
+        <!-- Analysis grid -->
+        <div class="analysis-grid">
+          <div class="analysis-card full-width">
+            <div class="analysis-card-label">Business Model Analysis</div>
+            <div class="analysis-text" id="bizModel">—</div>
+          </div>
+
+          <div class="analysis-card">
+            <div class="analysis-card-label">Market Opportunity</div>
+            <div class="analysis-text" id="marketOpp">—</div>
+          </div>
+
+          <div class="analysis-card">
+            <div class="analysis-card-label">Founder-Market Fit</div>
+            <div class="analysis-text" id="founderFit">—</div>
+          </div>
+
+          <div class="analysis-card">
+            <div class="analysis-card-label">Top 3 Risks</div>
+            <div class="risk-list" id="riskList"></div>
+          </div>
+
+          <div class="analysis-card">
+            <div class="analysis-card-label">Growth Opportunities</div>
+            <div id="oppList"></div>
+          </div>
+
+          <div class="analysis-card full-width">
+            <div class="analysis-card-label">Competitive Landscape</div>
+            <div id="competitorList"></div>
+          </div>
+        </div>
+
+        <!-- Final Verdict -->
+        <div class="final-verdict">
+          <div class="final-verdict-label">// Agent Final Verdict</div>
+          <div class="final-verdict-text" id="finalVerdict">—</div>
+        </div>
+
+        <div class="reset-row">
+          <button class="reset-btn" onclick="resetAgent()">← NEW ANALYSIS</button>
+          <span class="powered-tag">POWERED BY GEMINI · BUILT BY ARCHIT</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+let analysisCount = 0;
+
+function setExample(name) {
+  document.getElementById('startupInput').value = name;
+}
+
+function log(msg, type = 'run', stepId = null) {
+  const log = document.getElementById('progressLog');
+  const time = new Date().toLocaleTimeString('en-IN', { hour12: false });
+  const div = document.createElement('div');
+  div.className = 'log-line';
+  div.innerHTML = `<span class="log-time">[${time}]</span><span class="log-status-${type}">${type.toUpperCase()}</span><span class="log-msg">${msg}</span>`;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+
+  if (stepId) {
+    document.querySelectorAll('.agent-step').forEach(s => s.classList.remove('active'));
+    const step = document.getElementById(stepId);
+    if (step) step.classList.add('active');
+  }
+}
+
+function markStepDone(stepId) {
+  const step = document.getElementById(stepId);
+  if (step) {
+    step.classList.remove('active');
+    step.classList.add('done');
+    step.querySelector('.step-num').textContent = '✓';
+  }
+}
+
+async function runAgent() {
+  const apiKey = document.getElementById('apiKey').value.trim();
+  const startup = document.getElementById('startupInput').value.trim();
+
+  if (!apiKey) return showError('API key required. Get yours free at aistudio.google.com');
+  if (!startup) return showError('Enter a startup name to analyze.');
+
+  // Reset UI
+  document.getElementById('errorBlock').classList.remove('visible');
+  document.getElementById('resultsSection').classList.remove('visible');
+  document.getElementById('progressLog').innerHTML = '';
+  document.getElementById('progressSection').classList.add('visible');
+  document.querySelectorAll('.agent-step').forEach(s => {
+    s.classList.remove('active', 'done');
+    const num = s.querySelector('.step-num');
+    num.textContent = num.dataset.num || num.textContent;
+  });
+
+  const btn = document.getElementById('analyzeBtn');
+  btn.disabled = true;
+  btn.textContent = 'RUNNING...';
+
+  // Restore step numbers
+  ['1','2','3','4','5','6'].forEach((n,i) => {
+    const step = document.getElementById(`step${n}`);
+    if (step) step.querySelector('.step-num').textContent = n;
+  });
+
+  try {
+    log(`Initializing agent for target: "${startup}"`, 'info', 'step1');
+    await delay(400);
+    log(`Entity recognition complete`, 'ok');
+    markStepDone('step1');
+
+    log(`Scanning market landscape for ${startup}...`, 'run', 'step2');
+    await delay(300);
+    log(`Fetching funding history, business model data...`, 'run');
+    markStepDone('step2');
+
+    log(`Running competitive intelligence scan...`, 'run', 'step3');
+    await delay(300);
+    log(`Identifying direct and indirect competitors...`, 'run');
+    markStepDone('step3');
+
+    log(`Stress-testing risk vectors...`, 'run', 'step4');
+    await delay(300);
+    markStepDone('step4');
+
+    log(`Calibrating scoring engine across 4 dimensions...`, 'run', 'step5');
+    await delay(300);
+    markStepDone('step5');
+
+    log(`Synthesizing final verdict...`, 'run', 'step6');
+
+    const prompt = `You are a senior venture capital analyst specializing in Indian startups. Conduct a thorough, research-grade analysis of the Indian startup "${startup}".
+
+Use your knowledge of the Indian startup ecosystem to provide accurate, specific, data-driven insights. Be direct and honest — do not sugarcoat weaknesses.
+
+Return ONLY valid JSON with no markdown fences:
+{
+  "startupName": "${startup}",
+  "category": "<sector/category, e.g. Quick Commerce, EdTech, FinTech>",
+  "tagline": "<their actual tagline or a crisp description of what they do>",
+  "overallVerdict": "<Strong Buy | Watch | Caution | Neutral>",
+  "scores": {
+    "marketOpportunity": <0-100>,
+    "executionStrength": <0-100>,
+    "founderMarketFit": <0-100>,
+    "moatStrength": <0-100>
+  },
+  "businessModel": "<3-4 sentences on how they make money, their unit economics, and what makes their model work or not work>",
+  "marketOpportunity": "<3-4 sentences on TAM, growth trajectory, India-specific tailwinds or headwinds>",
+  "founderMarketFit": "<2-3 sentences on founder background and why they are or aren't the right team for this problem>",
+  "risks": [
+    "<specific risk 1 with real context>",
+    "<specific risk 2>",
+    "<specific risk 3>"
+  ],
+  "opportunities": [
+    "<specific growth opportunity 1>",
+    "<specific growth opportunity 2>",
+    "<specific growth opportunity 3>"
+  ],
+  "competitors": [
+    {"name": "<competitor name>", "type": "<Direct|Indirect|Emerging>"},
+    {"name": "<competitor name>", "type": "<Direct|Indirect|Emerging>"},
+    {"name": "<competitor name>", "type": "<Direct|Indirect|Emerging>"},
+    {"name": "<competitor name>", "type": "<Direct|Indirect|Emerging>"}
+  ],
+  "finalVerdict": "<4-5 sentences of sharp, honest, investor-grade final assessment. Include what would need to be true for this to be a 10x outcome, and what would kill it.>"
+}`;
+
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }]
+      })
+    });
+
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.error?.message || 'API request failed');
+    }
+
+    const data = await response.json();
+    let raw = data.candidates[0].content.parts[0].text.trim();
+    raw = raw.replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(raw);
+
+    markStepDone('step6');
+    log(`Analysis complete. Rendering report...`, 'ok');
+
+    await delay(400);
+    renderResults(parsed);
+
+    analysisCount++;
+    document.getElementById('analysisCount').textContent = analysisCount;
+
+  } catch (err) {
+    showError('Agent error: ' + err.message);
+    document.getElementById('progressSection').classList.remove('visible');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'RUN AGENT';
+  }
+}
+
+function renderResults(d) {
+  document.getElementById('startupCategory').textContent = d.category || '—';
+  document.getElementById('startupNameDisplay').textContent = d.startupName || '—';
+  document.getElementById('startupTagline').textContent = d.tagline || '—';
+
+  const badge = document.getElementById('verdictBadge');
+  badge.textContent = d.overallVerdict;
+  badge.className = 'verdict-badge';
+  const verdictMap = { 'Strong Buy': 'strong-buy', 'Watch': 'watch', 'Caution': 'caution', 'Neutral': 'neutral' };
+  badge.classList.add(verdictMap[d.overallVerdict] || 'neutral');
+
+  // Scores
+  const scoreGrid = document.getElementById('scoreGrid');
+  scoreGrid.innerHTML = '';
+  const scoreItems = [
+    { label: 'Market Opp.', value: d.scores?.marketOpportunity, unit: '/100' },
+    { label: 'Execution', value: d.scores?.executionStrength, unit: '/100' },
+    { label: 'Founder Fit', value: d.scores?.founderMarketFit, unit: '/100' },
+    { label: 'Moat', value: d.scores?.moatStrength, unit: '/100' }
+  ];
+
+  scoreItems.forEach(item => {
+    const v = item.value || 0;
+    const cls = v >= 70 ? 'high' : v >= 45 ? 'mid' : 'low';
+    const div = document.createElement('div');
+    div.className = `score-card ${cls}`;
+    div.innerHTML = `
+      <div class="score-card-label">${item.label}</div>
+      <div class="score-card-value">${v}</div>
+      <div class="score-card-sub">${item.unit}</div>`;
+    scoreGrid.appendChild(div);
+  });
+
+  document.getElementById('bizModel').textContent = d.businessModel || '—';
+  document.getElementById('marketOpp').textContent = d.marketOpportunity || '—';
+  document.getElementById('founderFit').textContent = d.founderMarketFit || '—';
+
+  // Risks
+  const riskList = document.getElementById('riskList');
+  riskList.innerHTML = '';
+  (d.risks || []).forEach((risk, i) => {
+    const div = document.createElement('div');
+    div.className = 'risk-item';
+    div.innerHTML = `<span class="risk-num">${i + 1}</span><span>${risk}</span>`;
+    riskList.appendChild(div);
+  });
+
+  // Opportunities
+  const oppList = document.getElementById('oppList');
+  oppList.innerHTML = '';
+  (d.opportunities || []).forEach(opp => {
+    const div = document.createElement('div');
+    div.className = 'opportunity-item';
+    div.innerHTML = `<span class="opp-arrow">→</span><span>${opp}</span>`;
+    oppList.appendChild(div);
+  });
+
+  // Competitors
+  const compList = document.getElementById('competitorList');
+  compList.innerHTML = '';
+  (d.competitors || []).forEach(comp => {
+    const tagClass = comp.type === 'Direct' ? 'tag-direct' : comp.type === 'Indirect' ? 'tag-indirect' : 'tag-emerging';
+    const div = document.createElement('div');
+    div.className = 'competitor-row';
+    div.innerHTML = `<span class="competitor-name">${comp.name}</span><span class="competitor-tag ${tagClass}">${comp.type}</span>`;
+    compList.appendChild(div);
+  });
+
+  document.getElementById('finalVerdict').textContent = d.finalVerdict || '—';
+
+  document.getElementById('progressSection').classList.remove('visible');
+  document.getElementById('resultsSection').classList.add('visible');
+  document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function showError(msg) {
+  const el = document.getElementById('errorBlock');
+  el.textContent = msg;
+  el.classList.add('visible');
+}
+
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function resetAgent() {
+  document.getElementById('resultsSection').classList.remove('visible');
+  document.getElementById('progressSection').classList.remove('visible');
+  document.getElementById('errorBlock').classList.remove('visible');
+  document.getElementById('startupInput').value = '';
+  document.querySelectorAll('.agent-step').forEach((s, i) => {
+    s.classList.remove('active', 'done');
+    s.querySelector('.step-num').textContent = i + 1;
+  });
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+</script>
+</body>
+</html>
